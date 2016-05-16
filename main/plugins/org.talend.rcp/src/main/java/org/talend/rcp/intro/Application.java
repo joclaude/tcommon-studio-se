@@ -46,6 +46,8 @@ import org.eclipse.ui.forms.widgets.Hyperlink;
 import org.osgi.service.prefs.BackingStoreException;
 import org.osgi.service.prefs.Preferences;
 import org.talend.commons.exception.BusinessException;
+import org.talend.commons.runtime.helper.PatchComponentHelper;
+import org.talend.commons.runtime.service.PatchComponent;
 import org.talend.commons.ui.swt.dialogs.ErrorDialogWidthDetailArea;
 import org.talend.commons.utils.system.EclipseCommandLine;
 import org.talend.core.BrandingChecker;
@@ -128,6 +130,19 @@ public class Application implements IApplication {
             service.executeWorspaceTasks();
             // saveConnectionBean(email);
 
+            // local patches
+            final PatchComponent patchComponent = PatchComponentHelper.getPatchComponent();
+            if (patchComponent != null) {
+                final boolean installed = patchComponent.install();
+                if (installed) {
+                    MessageDialog.openInformation(new Shell(), "Installing Patches", patchComponent.getInstalledMessages());
+                    if (patchComponent.needRelaunch()) {
+                        setRelaunchData();
+                        return IApplication.EXIT_RELAUNCH;
+                    }
+                }
+            }
+
             boolean logUserOnProject = logUserOnProject(display.getActiveShell());
             try {
                 if (!logUserOnProject) {
@@ -158,11 +173,7 @@ public class Application implements IApplication {
             if (LoginHelper.isRestart) {
                 // if after update,need to lauch the product by loading all new version plugins
                 if (afterUpdate) {
-                    EclipseCommandLine.updateOrCreateExitDataPropertyWithCommand(EclipseCommandLine.TALEND_RELOAD_COMMAND,
-                            Boolean.TRUE.toString(), false);
-                    // if relaunch, should delete the "disableLoginDialog" argument in eclipse data for bug TDI-19214
-                    EclipseCommandLine.updateOrCreateExitDataPropertyWithCommand(
-                            EclipseCommandLine.TALEND_DISABLE_LOGINDIALOG_COMMAND, null, true);
+                    setRelaunchData();
                     return IApplication.EXIT_RELAUNCH;
                 }
                 return IApplication.EXIT_RESTART;
@@ -223,6 +234,14 @@ public class Application implements IApplication {
             }
         }
 
+    }
+
+    private void setRelaunchData() {
+        EclipseCommandLine.updateOrCreateExitDataPropertyWithCommand(EclipseCommandLine.TALEND_RELOAD_COMMAND,
+                Boolean.TRUE.toString(), false);
+        // if relaunch, should delete the "disableLoginDialog" argument in eclipse data for bug TDI-19214
+        EclipseCommandLine.updateOrCreateExitDataPropertyWithCommand(EclipseCommandLine.TALEND_DISABLE_LOGINDIALOG_COMMAND, null,
+                true);
     }
 
     /**
